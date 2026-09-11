@@ -1999,18 +1999,40 @@
                         <!-- LEFT COLUMN: Product Selection & Cart Items -->
                         <div>
                             <!-- Item Selector Box -->
-                            <div class="pos-item-select-wrap">
+                            <div class="pos-item-select-wrap" style="position: relative; z-index: 50;">
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">
+                                    <label for="pos-search-input" style="font-size: 0.85rem; font-weight: 600; color: var(--text-main); cursor: pointer;">
                                         <i class="fa-solid fa-magnifying-glass" style="color: var(--accent-blue);"></i> Select Inventory Product
                                     </label>
                                     <div id="pos-stock-badge-wrap" style="display: none;">
                                         <span id="pos-stock-badge" class="stock-tag-badge stock-tag-green"></span>
                                     </div>
                                 </div>
-                                <select id="pos-item-select" style="width: 100%; padding: 9px 12px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--panel-border); color: var(--text-main); font-size: 0.92rem; font-family: inherit;">
+
+                                <!-- Searchable Combobox -->
+                                <div class="pos-combobox-wrap" id="pos-combobox-wrap">
+                                    <div class="pos-search-input-box">
+                                        <i class="fa-solid fa-magnifying-glass pos-search-icon"></i>
+                                        <input type="text" id="pos-search-input" class="pos-search-input" placeholder="Type product name, category or barcode to search..." autocomplete="off">
+                                        <div class="pos-search-actions">
+                                            <button type="button" id="pos-search-clear-btn" class="pos-search-btn" title="Clear selection" style="display: none;">
+                                                <i class="fa-solid fa-circle-xmark"></i>
+                                            </button>
+                                            <button type="button" id="pos-search-dropdown-toggle" class="pos-search-btn" title="Show all products">
+                                                <i class="fa-solid fa-chevron-down"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Dropdown list of filtered in-stock products -->
+                                    <div id="pos-search-dropdown" class="pos-dropdown-menu" style="display: none;"></div>
+                                </div>
+
+                                <!-- Hidden native select for 100% backward compatibility with all POS operations -->
+                                <select id="pos-item-select" style="display: none;">
                                     <option value="">-- Choose in-stock product to add --</option>
                                 </select>
+
 
                                 <div class="form-row" style="margin-top: 4px;">
                                     <div class="form-group" style="text-align: left; margin-bottom: 0;">
@@ -7852,6 +7874,318 @@ document.addEventListener('DOMContentLoaded', () => {
 
 let saleCart = []; // Array of { itemId, itemName, category, buyPrice, availableQty, qty, unitPrice, lineTotal }
 
+// Helper to get all in-stock products for POS with available qty calculation
+function getPosInStockItems() {
+    if (!Array.isArray(inventoryData)) return [];
+    return inventoryData.filter(item => {
+        const totalBuyQty = getBatches(item).reduce((sum, b) => sum + (b.buyQty || 0), 0) || item.buyQty || 0;
+        const availableQty = Math.max(0, totalBuyQty - (item.sellQty || 0));
+        return availableQty > 0;
+    }).map(item => {
+        const totalBuyQty = getBatches(item).reduce((sum, b) => sum + (b.buyQty || 0), 0) || item.buyQty || 0;
+        const availableQty = Math.max(0, totalBuyQty - (item.sellQty || 0));
+        return {
+            ...item,
+            availableStock: availableQty
+        };
+    }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+}
+
+// Render the search dropdown items based on keyword filter
+function renderPosSearchDropdown(query = '') {
+    const dropdown = document.getElementById('pos-search-dropdown');
+    if (!dropdown) return;
+
+    const items = getPosInStockItems();
+    const cleanQuery = (query || '').trim().toLowerCase();
+    const queryTokens = cleanQuery ? cleanQuery.split(/\s+/).filter(Boolean) : [];
+
+    // Filter items matching all keywords across name, category, item code, barcode, or shop
+    const filtered = items.filter(item => {
+        if (queryTokens.length === 0) return true;
+        const name = (item.name || '').toLowerCase();
+        const cat = (item.category || '').toLowerCase();
+        const code = (item.itemCode || item.barcode || item.sku || '').toLowerCase();
+        const shop = (item.shop || '').toLowerCase();
+        const combined = `${name} ${cat} ${code} ${shop}`;
+        return queryTokens.every(token => combined.includes(token));
+    });
+
+    if (filtered.length === 0) {
+        dropdown.innerHTML = `
+            <div class="pos-dropdown-empty">
+                <i class="fa-solid fa-magnifying-glass" style="font-size: 1.2rem; opacity: 0.5; margin-bottom: 6px; display: block;"></i>
+                No in-stock products found for "<strong>${escapeHtml(cleanQuery)}</strong>"
+            </div>
+        `;
+        dropdown.style.display = 'block';
+        return;
+    }
+
+    const currentSelectedId = document.getElementById('pos-item-select')?.value || '';
+
+    let html = `
+        <div class="pos-dropdown-header">
+            <span>In-Stock Products (${filtered.length})</span>
+            <span>Stock & Buy Price</span>
+        </div>
+        <div class="pos-dropdown-list-inner">
+    `;
+
+    filtered.forEach((item, idx) => {
+        const isSelected = item.id === currentSelectedId;
+        const isFirst = idx === 0 && cleanQuery.length > 0;
+        const activeClass = (isSelected || isFirst) ? ' active' : '';
+
+        // Highlight matching query tokens in name
+        let displayName = escapeHtml(item.name || 'Unnamed Product');
+        if (queryTokens.length > 0) {
+            queryTokens.forEach(token => {
+                const regex = new RegExp(`(${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                displayName = displayName.replace(regex, '<mark>$1</mark>');
+            });
+        }
+
+        const categoryName = escapeHtml(item.category || 'General');
+        const stockQty = item.availableStock;
+        const stockBadgeClass = stockQty > 2 ? 'in-stock' : 'low-stock';
+        const buyPrice = (item.buyPrice && item.buyPrice > 0) ? `Buy: ${formatCurrency(item.buyPrice)}` : '';
+
+        html += `
+            <div class="pos-dropdown-item${activeClass}" data-item-id="${item.id}" tabindex="0">
+                <div class="pos-item-info">
+                    <span class="pos-item-title">${displayName}</span>
+                    <div class="pos-item-meta">
+                        <span class="pos-item-category-chip">${categoryName}</span>
+                        ${item.itemCode ? `<span style="font-size: 0.72rem; color: var(--accent-blue);">${escapeHtml(item.itemCode)}</span>` : ''}
+                    </div>
+                </div>
+                <div class="pos-item-stats">
+                    <span class="pos-item-stock-chip ${stockBadgeClass}">
+                        <i class="fa-solid fa-boxes-stacked" style="font-size: 0.7rem; margin-right: 3px;"></i>${stockQty} pcs
+                    </span>
+                    ${buyPrice ? `<span class="pos-item-price-tag">${buyPrice}</span>` : ''}
+                </div>
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+    dropdown.innerHTML = html;
+    dropdown.style.display = 'block';
+
+    dropdown.querySelectorAll('.pos-dropdown-item').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const itemId = el.getAttribute('data-item-id');
+            selectPosItem(itemId);
+        });
+        el.addEventListener('mouseenter', () => {
+            dropdown.querySelectorAll('.pos-dropdown-item.active').forEach(a => a.classList.remove('active'));
+            el.classList.add('active');
+        });
+    });
+}
+
+// Select an item in POS
+function selectPosItem(itemId) {
+    const select = document.getElementById('pos-item-select');
+    const searchInput = document.getElementById('pos-search-input');
+    const clearBtn = document.getElementById('pos-search-clear-btn');
+    const dropdown = document.getElementById('pos-search-dropdown');
+    const qtyInput = document.getElementById('pos-item-qty');
+
+    if (!select) return;
+
+    if (!itemId) {
+        select.value = '';
+        if (searchInput) searchInput.value = '';
+        if (clearBtn) clearBtn.style.display = 'none';
+        if (dropdown) dropdown.style.display = 'none';
+        handlePosItemSelectChange();
+        return;
+    }
+
+    select.value = itemId;
+    const item = (inventoryData || []).find(i => i.id === itemId);
+
+    if (item && searchInput) {
+        searchInput.value = item.name || '';
+        if (clearBtn) clearBtn.style.display = 'flex';
+    }
+
+    if (dropdown) dropdown.style.display = 'none';
+
+    handlePosItemSelectChange();
+
+    if (qtyInput) {
+        qtyInput.focus();
+        qtyInput.select();
+    }
+}
+
+// Synchronize search input display with current select.value
+function syncPosSearchInputFromSelect() {
+    const select = document.getElementById('pos-item-select');
+    const searchInput = document.getElementById('pos-search-input');
+    const clearBtn = document.getElementById('pos-search-clear-btn');
+
+    if (!select || !searchInput) return;
+
+    if (!select.value) {
+        searchInput.value = '';
+        if (clearBtn) clearBtn.style.display = 'none';
+    } else {
+        const item = (inventoryData || []).find(i => i.id === select.value);
+        if (item) {
+            searchInput.value = item.name || '';
+            if (clearBtn) clearBtn.style.display = 'flex';
+        } else {
+            searchInput.value = '';
+            if (clearBtn) clearBtn.style.display = 'none';
+        }
+    }
+}
+
+// Initialize POS Searchable Product Combobox
+function initPosSearchCombobox() {
+    const searchInput = document.getElementById('pos-search-input');
+    const clearBtn = document.getElementById('pos-search-clear-btn');
+    const toggleBtn = document.getElementById('pos-search-dropdown-toggle');
+    const dropdown = document.getElementById('pos-search-dropdown');
+    const comboboxWrap = document.getElementById('pos-combobox-wrap');
+    const qtyInput = document.getElementById('pos-item-qty');
+    const priceInput = document.getElementById('pos-unit-price');
+
+    if (!searchInput || !dropdown) return;
+
+    // Filter as user types
+    searchInput.addEventListener('input', () => {
+        const val = searchInput.value;
+        if (clearBtn) {
+            clearBtn.style.display = val.length > 0 ? 'flex' : 'none';
+        }
+        renderPosSearchDropdown(val);
+
+        // If user manually changed search text away from selected item, deselect from select
+        const select = document.getElementById('pos-item-select');
+        if (select && select.value) {
+            const currentItem = (inventoryData || []).find(i => i.id === select.value);
+            if (currentItem && currentItem.name !== val) {
+                select.value = '';
+                handlePosItemSelectChange();
+            }
+        }
+    });
+
+    // Open dropdown on focus
+    searchInput.addEventListener('focus', () => {
+        renderPosSearchDropdown(searchInput.value);
+    });
+
+    // Open dropdown on click
+    searchInput.addEventListener('click', () => {
+        if (dropdown.style.display !== 'block') {
+            renderPosSearchDropdown(searchInput.value);
+        }
+    });
+
+    // Clear button
+    if (clearBtn) {
+        clearBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectPosItem('');
+            searchInput.focus();
+            renderPosSearchDropdown('');
+        });
+    }
+
+    // Dropdown toggle button
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (dropdown.style.display === 'block') {
+                dropdown.style.display = 'none';
+            } else {
+                renderPosSearchDropdown('');
+                searchInput.focus();
+            }
+        });
+    }
+
+    // Keyboard navigation (ArrowDown, ArrowUp, Enter, Escape)
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            dropdown.style.display = 'none';
+            return;
+        }
+
+        if (dropdown.style.display !== 'block') {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                renderPosSearchDropdown(searchInput.value);
+                return;
+            }
+        }
+
+        const items = Array.from(dropdown.querySelectorAll('.pos-dropdown-item'));
+        if (items.length === 0) return;
+
+        let currentIndex = items.findIndex(el => el.classList.contains('active'));
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            currentIndex = (currentIndex + 1) % items.length;
+            items.forEach((el, idx) => {
+                if (idx === currentIndex) {
+                    el.classList.add('active');
+                    el.scrollIntoView({ block: 'nearest' });
+                } else {
+                    el.classList.remove('active');
+                }
+            });
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            currentIndex = (currentIndex - 1 + items.length) % items.length;
+            items.forEach((el, idx) => {
+                if (idx === currentIndex) {
+                    el.classList.add('active');
+                    el.scrollIntoView({ block: 'nearest' });
+                } else {
+                    el.classList.remove('active');
+                }
+            });
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const activeItem = dropdown.querySelector('.pos-dropdown-item.active') || items[0];
+            if (activeItem) {
+                const itemId = activeItem.getAttribute('data-item-id');
+                selectPosItem(itemId);
+            }
+        }
+    });
+
+    // Close when clicking outside
+    document.addEventListener('click', (e) => {
+        if (comboboxWrap && !comboboxWrap.contains(e.target)) {
+            dropdown.style.display = 'none';
+            syncPosSearchInputFromSelect();
+        }
+    });
+
+    // Press Enter in Qty or Price to immediately Add Item to Cart
+    [qtyInput, priceInput].forEach(input => {
+        if (input) {
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addToSaleCart();
+                }
+            });
+        }
+    });
+}
+
 // 1. Populate POS Product Dropdown with In-Stock Items
 function populatePosItemDropdown() {
     const select = document.getElementById('pos-item-select');
@@ -7860,23 +8194,24 @@ function populatePosItemDropdown() {
     const previousVal = select.value;
     select.innerHTML = '<option value="">-- Choose in-stock product to add --</option>';
 
-    const inStockItems = inventoryData.filter(item => {
-        const totalBuyQty = getBatches(item).reduce((sum, b) => sum + (b.buyQty || 0), 0) || item.buyQty || 0;
-        const availableQty = Math.max(0, totalBuyQty - (item.sellQty || 0));
-        return availableQty > 0;
-    }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const inStockItems = getPosInStockItems();
 
     inStockItems.forEach(item => {
-        const totalBuyQty = getBatches(item).reduce((sum, b) => sum + (b.buyQty || 0), 0) || item.buyQty || 0;
-        const availableQty = Math.max(0, totalBuyQty - (item.sellQty || 0));
         const opt = document.createElement('option');
         opt.value = item.id;
-        opt.textContent = `${item.name} (${item.category || 'General'}) — Stock: ${availableQty} pcs — Buy: ${formatCurrency(item.buyPrice || 0)}`;
+        opt.textContent = `${item.name} (${item.category || 'General'}) — Stock: ${item.availableStock} pcs — Buy: ${formatCurrency(item.buyPrice || 0)}`;
         select.appendChild(opt);
     });
 
     if (previousVal && inStockItems.some(i => i.id === previousVal)) {
         select.value = previousVal;
+    }
+    syncPosSearchInputFromSelect();
+
+    const dropdown = document.getElementById('pos-search-dropdown');
+    if (dropdown && dropdown.style.display === 'block') {
+        const searchInput = document.getElementById('pos-search-input');
+        renderPosSearchDropdown(searchInput ? searchInput.value : '');
     }
 }
 
@@ -7986,8 +8321,12 @@ function addToSaleCart() {
     renderSaleCart();
 
     select.value = '';
+    syncPosSearchInputFromSelect();
     handlePosItemSelectChange();
     if (priceInput) priceInput.value = '';
+
+    const searchInput = document.getElementById('pos-search-input');
+    if (searchInput) searchInput.focus();
 }
 
 // 3. Render Cart
@@ -8080,6 +8419,7 @@ window.clearSaleCart = () => {
     renderSaleCart();
     const select = document.getElementById('pos-item-select');
     if (select) select.value = '';
+    syncPosSearchInputFromSelect();
     handlePosItemSelectChange();
 };
 
@@ -8088,9 +8428,13 @@ window.addToPosAndSwitch = (itemId) => {
     const select = document.getElementById('pos-item-select');
     if (select) {
         select.value = itemId;
+        syncPosSearchInputFromSelect();
         handlePosItemSelectChange();
         const qtyInput = document.getElementById('pos-item-qty');
-        if (qtyInput) qtyInput.focus();
+        if (qtyInput) {
+            qtyInput.focus();
+            qtyInput.select();
+        }
     }
 };
 
@@ -8808,7 +9152,10 @@ window.exportSalesPDF = () => {
 
 // Wiring POS Form Controls & Dropdowns
 document.addEventListener('DOMContentLoaded', () => {
-    // POS item select change
+    // Initialize searchable product combobox (replaces plain select)
+    initPosSearchCombobox();
+
+    // POS item select change (kept for backward-compat with hidden select)
     const posSelect = document.getElementById('pos-item-select');
     if (posSelect) posSelect.addEventListener('change', handlePosItemSelectChange);
 
