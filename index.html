@@ -1577,6 +1577,14 @@
                                 </div>
                                 <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
                                     <div class="filter-group">
+                                        <label for="expense-filter-source" style="margin-bottom:0; font-size: 0.85rem; font-weight: 500;">Cost Source:</label>
+                                        <select id="expense-filter-source">
+                                            <option value="all">All Costs (Unified)</option>
+                                            <option value="items">Item Additional Costs</option>
+                                            <option value="expenses">General Expenses</option>
+                                        </select>
+                                    </div>
+                                    <div class="filter-group">
                                         <label for="expense-filter-category" style="margin-bottom:0; font-size: 0.85rem; font-weight: 500;">Category:</label>
                                         <select id="expense-filter-category">
                                             <option value="">All Categories</option>
@@ -5017,13 +5025,140 @@ function getExpenseCategoryBadge(category) {
     return `<span class="cost-cat-badge ${badgeClass}">${icon} ${category || 'Other'}</span>`;
 }
 
-function getFilteredExpenses() {
-    const start = document.getElementById('expense-start-date').value;
-    const end = document.getElementById('expense-end-date').value;
-    const category = document.getElementById('expense-filter-category').value;
-    const searchKeyword = (document.getElementById('expense-search-input').value || '').trim().toLowerCase();
+// Build unified expense list combining general expenses and item-level additional costs
+function getAllExpensesList() {
+    const list = [];
 
-    let data = expensesData;
+    // 1. General standalone expenses
+    if (Array.isArray(expensesData)) {
+        expensesData.forEach(exp => {
+            list.push({
+                ...exp,
+                sourceType: 'general',
+                isItemCost: false
+            });
+        });
+    }
+
+    // 2. Item-level additional costs from inventory
+    if (Array.isArray(inventoryData)) {
+        inventoryData.forEach(item => {
+            const itemDate = item.date || (item.batches && item.batches[0]?.date) || new Date().toISOString().split('T')[0];
+
+            if (item.costCOD && item.costCOD > 0) {
+                list.push({
+                    id: `itemcost_${item.id}_cod`,
+                    sourceType: 'item_cost',
+                    isItemCost: true,
+                    costType: 'costCOD',
+                    itemId: item.id,
+                    itemName: item.name || 'Item',
+                    itemCategory: item.category || 'General',
+                    category: 'COD Return Fee',
+                    title: `COD Return Fee (${item.name || 'Item'})`,
+                    amount: item.costCOD,
+                    date: itemDate,
+                    notes: `Item-linked cost recorded under "${item.name}"`
+                });
+            }
+
+            if (item.costPacking && item.costPacking > 0) {
+                list.push({
+                    id: `itemcost_${item.id}_packing`,
+                    sourceType: 'item_cost',
+                    isItemCost: true,
+                    costType: 'costPacking',
+                    itemId: item.id,
+                    itemName: item.name || 'Item',
+                    itemCategory: item.category || 'General',
+                    category: 'Packing Material',
+                    title: `Packing Material (${item.name || 'Item'})`,
+                    amount: item.costPacking,
+                    date: itemDate,
+                    notes: `Item-linked cost recorded under "${item.name}"`
+                });
+            }
+
+            if (item.costDefect && item.costDefect > 0) {
+                list.push({
+                    id: `itemcost_${item.id}_defect`,
+                    sourceType: 'item_cost',
+                    isItemCost: true,
+                    costType: 'costDefect',
+                    itemId: item.id,
+                    itemName: item.name || 'Item',
+                    itemCategory: item.category || 'General',
+                    category: 'Defect Item Refund',
+                    title: `Defect Item Refund (${item.name || 'Item'})`,
+                    amount: item.costDefect,
+                    date: itemDate,
+                    notes: `Item-linked cost recorded under "${item.name}"`
+                });
+            }
+
+            if (item.costOther && item.costOther > 0) {
+                list.push({
+                    id: `itemcost_${item.id}_other`,
+                    sourceType: 'item_cost',
+                    isItemCost: true,
+                    costType: 'costOther',
+                    itemId: item.id,
+                    itemName: item.name || 'Item',
+                    itemCategory: item.category || 'General',
+                    category: 'Other',
+                    title: `Other Item Cost (${item.name || 'Item'})`,
+                    amount: item.costOther,
+                    date: itemDate,
+                    notes: `Item-linked cost recorded under "${item.name}"`
+                });
+            }
+        });
+    }
+
+    // Sort by date descending
+    list.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    return list;
+}
+
+window.openItemCostsModalFromExpense = (itemId) => {
+    const item = inventoryData.find(i => i.id === itemId);
+    if (!item) {
+        alert("Item not found in inventory.");
+        return;
+    }
+    const codV = item.costCOD || 0;
+    const packV = item.costPacking || 0;
+    const defV = item.costDefect || 0;
+    const othV = item.costOther || 0;
+    openCostsModal(item.id, item.name, codV, packV, defV, othV);
+};
+
+window.deleteItemCost = async (itemId, costType, costTitle, amount) => {
+    if (!confirm(`Are you sure you want to remove "${costTitle}" (${formatCurrency(amount)}) from this item's cost record?`)) return;
+    try {
+        await updateDoc(doc(db, "inventory", itemId), {
+            [costType]: 0
+        });
+    } catch (error) {
+        console.error("Error removing item cost: ", error);
+        alert("Failed to remove item cost: " + (error.message || 'Unknown error'));
+    }
+};
+
+function getFilteredExpenses() {
+    const start = document.getElementById('expense-start-date')?.value;
+    const end = document.getElementById('expense-end-date')?.value;
+    const category = document.getElementById('expense-filter-category')?.value;
+    const source = document.getElementById('expense-filter-source')?.value || 'all';
+    const searchKeyword = (document.getElementById('expense-search-input')?.value || '').trim().toLowerCase();
+
+    let data = getAllExpensesList();
+
+    if (source === 'expenses') {
+        data = data.filter(exp => !exp.isItemCost);
+    } else if (source === 'items') {
+        data = data.filter(exp => exp.isItemCost);
+    }
 
     if (start || end) {
         data = data.filter(exp => {
@@ -5051,7 +5186,8 @@ function getFilteredExpenses() {
             const cat = (exp.category || '').toLowerCase();
             const notes = (exp.notes || '').toLowerCase();
             const itemName = (exp.itemName || '').toLowerCase();
-            return title.includes(searchKeyword) || cat.includes(searchKeyword) || notes.includes(searchKeyword) || itemName.includes(searchKeyword);
+            const itemCat = (exp.itemCategory || '').toLowerCase();
+            return title.includes(searchKeyword) || cat.includes(searchKeyword) || notes.includes(searchKeyword) || itemName.includes(searchKeyword) || itemCat.includes(searchKeyword);
         });
     }
 
@@ -5146,15 +5282,27 @@ function renderExpenses() {
 
         let linkedItemDisplay = '<span style="color:var(--text-muted); font-size:0.82rem;">General Business</span>';
         if (exp.itemName) {
-            linkedItemDisplay = `<span class="expense-item-link"><i class="fa-solid fa-cube"></i> ${exp.itemName}</span>`;
+            const itemCatInfo = exp.itemCategory ? ` <small style="color:var(--text-muted)">(${exp.itemCategory})</small>` : '';
+            linkedItemDisplay = `<span class="expense-item-link" onclick="switchMainTab('inventory')" style="cursor:pointer;" title="Click to view in Inventory"><i class="fa-solid fa-cube"></i> ${escapeHtml(exp.itemName)}${itemCatInfo}</span>`;
         }
 
-        let descDisplay = `<strong>${exp.title || '-'}</strong>`;
+        const safeTitle = (exp.title || '').replace(/'/g, "\\'");
+        let descDisplay = `<strong>${escapeHtml(exp.title || '-')}</strong>`;
+        if (exp.isItemCost) {
+            descDisplay += ` <span class="cost-type-badge cost-badge-cod" style="font-size:0.7rem; margin-left:4px; vertical-align:middle;"><i class="fa-solid fa-cube"></i> Item Cost</span>`;
+        }
         if (exp.notes) {
-            descDisplay += `<br><small style="color:var(--text-muted);"><i class="fa-regular fa-comment-dots" style="margin-right:4px;"></i>${exp.notes}</small>`;
+            descDisplay += `<br><small style="color:var(--text-muted);"><i class="fa-regular fa-comment-dots" style="margin-right:4px;"></i>${escapeHtml(exp.notes)}</small>`;
         }
 
-        const actionButtons = `
+        const actionButtons = exp.isItemCost ? `
+            <button class="btn btn-icon" onclick="openItemCostsModalFromExpense('${exp.itemId}')" title="Edit Item Costs Modal" style="background: rgba(59,130,246,0.15); color: var(--accent-blue);">
+                <i class="fa-solid fa-receipt"></i>
+            </button>
+            <button class="btn btn-icon btn-delete" onclick="deleteItemCost('${exp.itemId}', '${exp.costType}', '${safeTitle}', ${exp.amount})" title="Remove this Item Cost">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        ` : `
             <button class="btn btn-icon" onclick="openEditExpenseModal('${exp.id}')" title="Edit Expense" style="background: rgba(245,158,11,0.15); color: var(--accent-orange);">
                 <i class="fa-solid fa-pen-to-square"></i>
             </button>
@@ -5190,6 +5338,9 @@ function renderExpenses() {
     }
 });
 
+const expFilterSrc = document.getElementById('expense-filter-source');
+if (expFilterSrc) expFilterSrc.addEventListener('change', renderExpenses);
+
 const expFilterCat = document.getElementById('expense-filter-category');
 if (expFilterCat) expFilterCat.addEventListener('change', renderExpenses);
 
@@ -5201,6 +5352,8 @@ if (expClearBtn) {
     expClearBtn.addEventListener('click', () => {
         document.getElementById('expense-start-date').value = '';
         document.getElementById('expense-end-date').value = '';
+        const srcEl = document.getElementById('expense-filter-source');
+        if (srcEl) srcEl.value = 'all';
         document.getElementById('expense-filter-category').value = '';
         document.getElementById('expense-search-input').value = '';
         setExpensePeriod('all');
@@ -5753,16 +5906,25 @@ function getFullTaxReportData() {
         totalSoldQty += entry.sellQty;
     });
 
-    let standaloneExpenses = 0;
+    let totalGeneralExpenses = 0;
+    let totalItemLevelCosts = 0;
     const expensesByCategory = {};
-    filteredExpenses.forEach(exp => {
+    const unifiedPeriodExpenses = getAllExpensesList().filter(exp => {
+        if (start && end) return exp.date >= start && exp.date <= end;
+        if (start) return exp.date >= start;
+        if (end) return exp.date <= end;
+        return true;
+    });
+
+    unifiedPeriodExpenses.forEach(exp => {
         const amt = exp.amount || 0;
-        standaloneExpenses += amt;
+        if (exp.isItemCost) totalItemLevelCosts += amt;
+        else totalGeneralExpenses += amt;
         const cat = exp.category || 'Other';
         expensesByCategory[cat] = (expensesByCategory[cat] || 0) + amt;
     });
 
-    const totalOperationalCosts = totalItemCosts + standaloneExpenses;
+    const totalOperationalCosts = totalItemLevelCosts + totalGeneralExpenses;
     const grossProfit = totalRevenue - totalCOGS;
     const netProfit = grossProfit - totalOperationalCosts;
     const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
@@ -5784,15 +5946,15 @@ function getFullTaxReportData() {
         totalCOGS,
         grossProfit,
         grossMargin,
-        totalItemCosts,
-        standaloneExpenses,
+        totalItemCosts: totalItemLevelCosts,
+        standaloneExpenses: totalGeneralExpenses,
         totalOperationalCosts,
         netProfit,
         netMargin,
         totalSoldQty,
         totalPurchases,
         filteredItems,
-        filteredExpenses,
+        filteredExpenses: unifiedPeriodExpenses,
         expensesByCategory,
         periodBills
     };
