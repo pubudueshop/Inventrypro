@@ -14,6 +14,7 @@ const emptyState = document.getElementById('empty-state');
 // Stats Elements
 const statTotalItems = document.getElementById('stat-total-items');
 const statTotalInvestment = document.getElementById('stat-total-investment');
+const statStockValue = document.getElementById('stat-stock-value');
 const statTotalRevenue = document.getElementById('stat-total-revenue');
 const statTotalProfit = document.getElementById('stat-total-profit');
 
@@ -223,12 +224,15 @@ function updateDashboard() {
     let totalInvestment = 0;
     let totalRevenue = 0;
     let costOfGoodsSold = 0;
+    let totalCurrentStockValue = 0;
     
     filteredData.forEach(item => {
         totalInvestment += item.buyPrice;
         if (item.status === 'sold') {
             totalRevenue += item.sellPrice;
             costOfGoodsSold += item.buyPrice;
+        } else {
+            totalCurrentStockValue += item.buyPrice;
         }
     });
     
@@ -236,6 +240,7 @@ function updateDashboard() {
 
     statTotalItems.textContent = totalItems;
     statTotalInvestment.textContent = formatCurrency(totalInvestment);
+    if (statStockValue) statStockValue.textContent = formatCurrency(totalCurrentStockValue);
     statTotalRevenue.textContent = formatCurrency(totalRevenue);
     
     statTotalProfit.textContent = formatCurrency(totalProfit);

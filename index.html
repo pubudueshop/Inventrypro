@@ -480,17 +480,28 @@
                     </div>
 
                     <!-- How to Get Payment -->
-                    <div class="form-group" style="text-align: left;">
-                        <label for="sell-input-payment"><i class="fa-solid fa-money-bill-wave" style="color: var(--accent-green);"></i> How to Get Payment</label>
-                        <select id="sell-input-payment" required>
-                            <option value="Cash">💵 Cash</option>
-                            <option value="Bank Transfer">🏦 Bank Transfer / Online</option>
-                            <option value="Card Payment">💳 Card (Credit / Debit)</option>
-                            <option value="Cash on Delivery (COD)">📦 Cash on Delivery (COD)</option>
-                            <option value="Credit / Pay Later">⏳ Credit / Pay Later</option>
-                            <option value="Cheque">📝 Cheque</option>
-                            <option value="Other">✏️ Other...</option>
-                        </select>
+                    <div class="form-row">
+                        <div class="form-group" style="text-align: left;">
+                            <label for="sell-input-payment"><i class="fa-solid fa-money-bill-wave" style="color: var(--accent-green);"></i> How to Get Payment</label>
+                            <select id="sell-input-payment" required>
+                                <option value="Cash">💵 Cash</option>
+                                <option value="Bank Transfer">🏦 Bank Transfer / Online</option>
+                                <option value="Card Payment">💳 Card (Credit / Debit)</option>
+                                <option value="Cash on Delivery (COD)">📦 Cash on Delivery (COD)</option>
+                                <option value="Credit / Pay Later">⏳ Credit / Pay Later</option>
+                                <option value="Cheque">📝 Cheque</option>
+                                <option value="Other">✏️ Other...</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="text-align: left;">
+                            <label for="sell-payment-status"><i class="fa-solid fa-circle-check" style="color: var(--accent-green);"></i> Payment Status</label>
+                            <select id="sell-payment-status">
+                                <option value="Paid">✅ Paid (Completed)</option>
+                                <option value="Pending">⏳ Pending / To Collect</option>
+                                <option value="Partial">🔄 Partial Payment</option>
+                                <option value="Due">⚠️ Credit / Due</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="form-group hidden" id="sell-custom-payment-group" style="text-align: left;">
                         <label for="sell-custom-payment">Custom Payment Method</label>
@@ -557,6 +568,82 @@
                 <div style="margin-top: 20px; text-align: right;">
                     <button type="button" class="btn btn-secondary" onclick="closeSaleReceiptModal()">Close</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- 💳 Update Payment Status Modal -->
+        <div id="payment-status-modal" class="overlay hidden">
+            <div class="overlay-content glass-panel" style="max-width: 480px; width: 95%;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--panel-border); padding-bottom: 12px;">
+                    <h2 style="color: var(--accent-green); margin-bottom: 0; display: flex; align-items: center; gap: 8px; font-size: 1.2rem;">
+                        <i class="fa-solid fa-hand-holding-dollar"></i>
+                        <span id="psm-title">Update Payment Status</span>
+                    </h2>
+                    <button type="button" class="btn btn-icon" onclick="closePaymentStatusModal()" title="Close">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <form id="payment-status-form" onsubmit="handleSavePaymentStatus(event)">
+                    <input type="hidden" id="psm-group-key">
+
+                    <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="color: var(--text-muted); font-size: 0.8rem;">Order ID:</span>
+                            <strong id="psm-order-id" style="font-family: monospace; color: var(--accent-blue); font-size: 0.95rem;"></strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="color: var(--text-muted); font-size: 0.8rem;">Customer:</span>
+                            <strong id="psm-customer" style="font-size: 0.85rem;"></strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: var(--text-muted); font-size: 0.8rem;">Total Amount:</span>
+                            <strong id="psm-amount" style="color: var(--accent-green); font-size: 1.15rem;"></strong>
+                        </div>
+                    </div>
+
+                    <!-- Payment Status Selection -->
+                    <div class="form-group" style="text-align: left;">
+                        <label for="psm-status"><i class="fa-solid fa-circle-check" style="color: var(--accent-green);"></i> Payment Status</label>
+                        <select id="psm-status" required style="width: 100%;">
+                            <option value="Paid">✅ Paid (Payment Received / Settled)</option>
+                            <option value="Pending">⏳ Pending (Not Received Yet)</option>
+                            <option value="Partial">🔄 Partial Payment</option>
+                            <option value="Due">⚠️ Credit / Due</option>
+                        </select>
+                    </div>
+
+                    <!-- Received Date -->
+                    <div class="form-group" style="text-align: left;">
+                        <label for="psm-received-date"><i class="fa-solid fa-calendar-day" style="color: var(--accent-blue);"></i> Payment Received Date</label>
+                        <input type="date" id="psm-received-date" required style="width: 100%;">
+                    </div>
+
+                    <!-- Payment Method Option -->
+                    <div class="form-group" style="text-align: left;">
+                        <label for="psm-payment-method"><i class="fa-solid fa-money-bill-wave" style="color: var(--accent-green);"></i> Payment Method</label>
+                        <select id="psm-payment-method" style="width: 100%;">
+                            <option value="keep">Keep Current (<span id="psm-current-method">Current</span>)</option>
+                            <option value="Cash">💵 Cash</option>
+                            <option value="Bank Transfer">🏦 Bank Transfer / Online Remittance</option>
+                            <option value="Card Payment">💳 Card Payment</option>
+                            <option value="Cash on Delivery (COD)">📦 Cash on Delivery (COD)</option>
+                        </select>
+                    </div>
+
+                    <!-- Note / Courier Slip Ref -->
+                    <div class="form-group" style="text-align: left;">
+                        <label for="psm-note"><i class="fa-solid fa-note-sticky" style="color: var(--accent-orange);"></i> Payment Note / Courier Settlement Ref</label>
+                        <input type="text" id="psm-note" placeholder="e.g. Courier remit slip #9842, Cash collected by rider">
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                        <button type="button" class="btn btn-secondary" onclick="closePaymentStatusModal()">Cancel</button>
+                        <button type="submit" id="psm-submit-btn" class="btn btn-primary" style="background-color: var(--accent-green);">
+                            <i class="fa-solid fa-check-double"></i> Save & Mark Payment
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
 
@@ -1167,6 +1254,13 @@
                         <div class="stat-info">
                             <h3>Total Investment</h3>
                             <p id="stat-total-investment">Rs 0.00</p>
+                        </div>
+                    </div>
+                    <div class="stat-card glass-panel">
+                        <div class="stat-icon cyan"><i class="fa-solid fa-boxes-stacked"></i></div>
+                        <div class="stat-info">
+                            <h3>Current Stock Value</h3>
+                            <p id="stat-stock-value" style="color: #06b6d4;">Rs 0.00</p>
                         </div>
                     </div>
                     <div class="stat-card glass-panel">
@@ -2049,7 +2143,22 @@
                                         </button>
                                     </div>
                                 </div>
+
+                                <!-- Undo / Edit Last Entry action bar -->
+                                <div id="pos-undo-bar" style="display: none; margin-top: 8px; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                    <div style="flex: 1; min-width: 0; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; padding: 7px 12px; display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                                        <i class="fa-solid fa-clock-rotate-left" style="color: #f59e0b; flex-shrink: 0; font-size: 0.85rem;"></i>
+                                        <span id="pos-undo-label" style="font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
+                                    </div>
+                                    <button type="button" id="pos-undo-btn" class="btn" style="background: rgba(245,158,11,0.2); color: #f59e0b; border: 1px solid rgba(245,158,11,0.4); height: 34px; padding: 0 14px; font-size: 0.82rem; white-space: nowrap; flex-shrink: 0;" title="Undo last add">
+                                        <i class="fa-solid fa-rotate-left"></i> Undo
+                                    </button>
+                                    <button type="button" id="pos-edit-last-btn" class="btn" style="background: rgba(59,130,246,0.2); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.4); height: 34px; padding: 0 14px; font-size: 0.82rem; white-space: nowrap; flex-shrink: 0;" title="Edit last added item">
+                                        <i class="fa-solid fa-pen-to-square"></i> Edit Last
+                                    </button>
+                                </div>
                             </div>
+
 
                             <!-- Cart Items List Table -->
                             <div style="margin-top: 16px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid var(--panel-border); overflow: hidden;">
@@ -2235,6 +2344,17 @@
                                 </select>
                             </div>
 
+                            <!-- Payment Status Filter -->
+                            <div>
+                                <select id="sales-filter-status" onchange="renderSalesTable(); updateSalesKPIs();" style="font-size: 0.82rem; padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.07); border: 1px solid var(--panel-border); color: var(--text-main); cursor: pointer;">
+                                    <option value="">All Payment Statuses</option>
+                                    <option value="Pending">⏳ Pending Payment</option>
+                                    <option value="Paid">✅ Paid (Received)</option>
+                                    <option value="Due">⚠️ Due / Credit</option>
+                                    <option value="Partial">🔄 Partial Payment</option>
+                                </select>
+                            </div>
+
                             <!-- Sales Channel Filter -->
                             <div>
                                 <select id="sales-filter-channel" onchange="renderSalesTable(); updateSalesKPIs();" style="font-size: 0.82rem; padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.07); border: 1px solid var(--panel-border); color: var(--text-main); cursor: pointer;">
@@ -2317,6 +2437,7 @@ const inventoryTbody = document.getElementById('inventory-tbody');
 const emptyState = document.getElementById('empty-state');
 const statTotalItems = document.getElementById('stat-total-items');
 const statTotalInvestment = document.getElementById('stat-total-investment');
+const statStockValue = document.getElementById('stat-stock-value');
 const statTotalRevenue = document.getElementById('stat-total-revenue');
 const statTotalProfit = document.getElementById('stat-total-profit');
 const statTotalCosts = document.getElementById('stat-total-costs');
@@ -3383,9 +3504,11 @@ window.openSellModal = (id, name, availableQty, currentSellQty, currentRevenue, 
         if (customChannelInput) customChannelInput.value = "";
     }
 
-    // Reset Payment Method
+    // Reset Payment Method & Status
     const paymentSelect = document.getElementById('sell-input-payment');
     if (paymentSelect) paymentSelect.value = "Cash";
+    const paymentStatusSelect = document.getElementById('sell-payment-status');
+    if (paymentStatusSelect) paymentStatusSelect.value = "Paid";
     const customPaymentGroup = document.getElementById('sell-custom-payment-group');
     if (customPaymentGroup) {
         customPaymentGroup.classList.add('hidden');
@@ -3464,6 +3587,17 @@ if (sellPaymentSelect && sellCustomPaymentGroup) {
             sellCustomPaymentGroup.classList.add('hidden');
             if (sellCustomPaymentInput) sellCustomPaymentInput.value = '';
         }
+
+        const statusEl = document.getElementById('sell-payment-status');
+        if (statusEl) {
+            if (e.target.value === 'Cash on Delivery (COD)') {
+                statusEl.value = 'Pending';
+            } else if (e.target.value === 'Credit / Pay Later') {
+                statusEl.value = 'Due';
+            } else if (e.target.value === 'Cash' || e.target.value === 'Bank Transfer' || e.target.value === 'Card Payment') {
+                statusEl.value = 'Paid';
+            }
+        }
     });
 }
 
@@ -3502,7 +3636,7 @@ sellForm.addEventListener('submit', async (e) => {
         return;
     }
 
-    // Capture Sales Channel, Payment Method, Delivery Method & Note
+    // Capture Sales Channel, Payment Method, Payment Status, Delivery Method & Note
     let channel = document.getElementById('sell-input-channel') ? document.getElementById('sell-input-channel').value : 'Retail / In-Store';
     if (channel === 'Other') {
         channel = (document.getElementById('sell-custom-channel')?.value || '').trim() || 'Other';
@@ -3512,6 +3646,8 @@ sellForm.addEventListener('submit', async (e) => {
     if (payment === 'Other') {
         payment = (document.getElementById('sell-custom-payment')?.value || '').trim() || 'Other';
     }
+
+    const paymentStatus = document.getElementById('sell-payment-status') ? document.getElementById('sell-payment-status').value : 'Paid';
 
     let delivery = document.getElementById('sell-input-delivery') ? document.getElementById('sell-input-delivery').value : 'Hand Delivery / Pickup';
     if (delivery === 'Other') {
@@ -3530,6 +3666,7 @@ sellForm.addEventListener('submit', async (e) => {
         revenue: addSellQty * unitSellPrice,
         channel: channel,
         paymentMethod: payment,
+        paymentStatus: paymentStatus,
         deliveryMethod: delivery,
         note: note,
         timestamp: new Date().toISOString()
@@ -3965,13 +4102,24 @@ window.openShopDetailsModal = (id) => {
                 const delivery = s.deliveryMethod || 'Hand Delivery / Pickup';
                 const note = s.note || '';
 
+                let statusBadge = '';
+                const isPending = s.paymentStatus === 'Pending' || (payment.toLowerCase().includes('cod') && s.paymentStatus !== 'Paid');
+                const isDue = s.paymentStatus === 'Due' || payment.toLowerCase().includes('credit');
+                if (isPending) {
+                    statusBadge = `<span class="category-badge badge-yellow" style="font-size:0.68rem; margin-top:2px; display:inline-block;"><i class="fa-solid fa-clock"></i> Pending</span>`;
+                } else if (isDue) {
+                    statusBadge = `<span class="category-badge badge-red" style="font-size:0.68rem; margin-top:2px; display:inline-block;"><i class="fa-solid fa-triangle-exclamation"></i> Due</span>`;
+                } else {
+                    statusBadge = `<span class="category-badge badge-green" style="font-size:0.68rem; margin-top:2px; display:inline-block;"><i class="fa-solid fa-circle-check"></i> Paid</span>`;
+                }
+
                 tr.innerHTML = `
                     <td>${formatDateDisplay(s.date)}</td>
                     <td><strong>${s.qty}</strong> Pcs</td>
                     <td>${formatCurrency(s.unitPrice)}</td>
                     <td><strong style="color:var(--accent-green);">${formatCurrency(s.revenue)}</strong></td>
                     <td>${getSaleChannelBadge(channel)}</td>
-                    <td>${getPaymentBadge(payment)}</td>
+                    <td>${getPaymentBadge(payment)}<div>${statusBadge}</div></td>
                     <td>${getDeliveryBadge(delivery, note)}</td>
                     <td>${deleteBtn}</td>
                 `;
@@ -4399,6 +4547,7 @@ function updateDashboard() {
     let totalRevenue = 0;
     let costOfGoodsSold = 0;
     let totalAdditionalCosts = 0;
+    let totalCurrentStockValue = 0;
     
     filteredData.forEach(item => {
         const batches = getBatches(item);
@@ -4408,9 +4557,9 @@ function updateDashboard() {
         totalInvestment += itemInvestment;
         totalAdditionalCosts += getAdditionalCosts(item);
         
+        let cogs = 0;
         if (item.sellQty > 0) {
             totalRevenue += item.totalRevenue;
-            let cogs = 0;
             let remainingSellQty = item.sellQty;
             const sortedBatches = [...batches].sort((a, b) => new Date(a.date) - new Date(b.date));
             for (const b of sortedBatches) {
@@ -4421,6 +4570,9 @@ function updateDashboard() {
             }
             costOfGoodsSold += cogs;
         }
+
+        const itemStockValue = Math.max(0, itemInvestment - cogs);
+        totalCurrentStockValue += itemStockValue;
     });
 
     // Also include standalone expenses from Expense Manager in the selected date range
@@ -4443,6 +4595,9 @@ function updateDashboard() {
 
     statTotalItems.textContent = totalItems;
     statTotalInvestment.textContent = formatCurrency(totalInvestment);
+    if (statStockValue) {
+        statStockValue.textContent = formatCurrency(totalCurrentStockValue);
+    }
     statTotalRevenue.textContent = formatCurrency(totalRevenue);
     statTotalCosts.textContent = formatCurrency(totalAdditionalCosts);
     
@@ -8547,6 +8702,10 @@ async function completeSaleOrder() {
         if (document.getElementById('pos-customer-phone')) document.getElementById('pos-customer-phone').value = '';
         if (document.getElementById('pos-tracking-no')) document.getElementById('pos-tracking-no').value = '';
         if (document.getElementById('pos-sale-note')) document.getElementById('pos-sale-note').value = '';
+        if (document.getElementById('pos-sale-payment')) document.getElementById('pos-sale-payment').value = 'Cash';
+        if (document.getElementById('pos-payment-status')) document.getElementById('pos-payment-status').value = 'Paid';
+        if (document.getElementById('pos-custom-payment-wrap')) document.getElementById('pos-custom-payment-wrap').classList.add('hidden');
+        if (document.getElementById('pos-custom-payment')) document.getElementById('pos-custom-payment').value = '';
 
         openSaleReceiptModal(orderId);
 
@@ -8630,6 +8789,7 @@ function getFilteredSalesOrders() {
     const orders = getAllSalesOrders();
     const searchVal = (document.getElementById('sales-filter-search')?.value || '').trim().toLowerCase();
     const paymentVal = document.getElementById('sales-filter-payment')?.value || '';
+    const statusVal = document.getElementById('sales-filter-status')?.value || '';
     const channelVal = document.getElementById('sales-filter-channel')?.value || '';
     const startDate = document.getElementById('sales-filter-start-date')?.value || '';
     const endDate = document.getElementById('sales-filter-end-date')?.value || '';
@@ -8648,6 +8808,17 @@ function getFilteredSalesOrders() {
             else if (filterP.includes('credit') && !p.includes('credit') && !p.includes('later') && !p.includes('due')) return false;
             else if (filterP.includes('cheque') && !p.includes('cheque')) return false;
             else if (filterP.includes('other') && (p.includes('cash') || p.includes('bank') || p.includes('card') || p.includes('cod') || p.includes('credit'))) return false;
+        }
+
+        if (statusVal) {
+            const isOrderPending = order.paymentStatus === 'Pending' || (order.paymentMethod.toLowerCase().includes('cod') && order.paymentStatus !== 'Paid');
+            const isOrderDue = order.paymentStatus === 'Due' || order.paymentMethod.toLowerCase().includes('credit');
+            const isOrderPaid = order.paymentStatus === 'Paid' || (!isOrderPending && !isOrderDue);
+
+            if (statusVal === 'Pending' && !isOrderPending) return false;
+            if (statusVal === 'Due' && !isOrderDue) return false;
+            if (statusVal === 'Paid' && !isOrderPaid) return false;
+            if (statusVal === 'Partial' && order.paymentStatus !== 'Partial') return false;
         }
 
         if (channelVal && order.channel !== channelVal) return false;
@@ -8684,8 +8855,8 @@ window.updateSalesKPIs = () => {
         cash: { amount: 0, count: 0 },
         bank: { amount: 0, count: 0 },
         card: { amount: 0, count: 0 },
-        cod: { amount: 0, count: 0 },
-        credit: { amount: 0, count: 0 },
+        cod: { amount: 0, count: 0, pendingCount: 0, pendingAmount: 0 },
+        credit: { amount: 0, count: 0, pendingCount: 0, pendingAmount: 0 },
         other: { amount: 0, count: 0 }
     };
 
@@ -8694,6 +8865,9 @@ window.updateSalesKPIs = () => {
         totalUnits += order.totalQty;
 
         const p = (order.paymentMethod || '').toLowerCase();
+        const isPending = order.paymentStatus === 'Pending' || (p.includes('cod') && order.paymentStatus !== 'Paid');
+        const isDue = order.paymentStatus === 'Due' || p.includes('credit');
+
         if (p.includes('bank') || p.includes('transfer')) {
             payMap.bank.amount += order.totalRevenue;
             payMap.bank.count += 1;
@@ -8703,9 +8877,17 @@ window.updateSalesKPIs = () => {
         } else if (p.includes('cod') || p.includes('cash on delivery')) {
             payMap.cod.amount += order.totalRevenue;
             payMap.cod.count += 1;
+            if (isPending) {
+                payMap.cod.pendingCount += 1;
+                payMap.cod.pendingAmount += order.totalRevenue;
+            }
         } else if (p.includes('credit') || p.includes('later') || p.includes('due')) {
             payMap.credit.amount += order.totalRevenue;
             payMap.credit.count += 1;
+            if (isDue) {
+                payMap.credit.pendingCount += 1;
+                payMap.credit.pendingAmount += order.totalRevenue;
+            }
         } else if (p.includes('cash')) {
             payMap.cash.amount += order.totalRevenue;
             payMap.cash.count += 1;
@@ -8733,7 +8915,15 @@ window.updateSalesKPIs = () => {
         const amtEl = document.getElementById(`sales-pay-${type}`);
         const cntEl = document.getElementById(`sales-count-${type}`);
         if (amtEl) amtEl.textContent = formatCurrency(payMap[key].amount);
-        if (cntEl) cntEl.textContent = `${payMap[key].count} order${payMap[key].count === 1 ? '' : 's'}`;
+        if (cntEl) {
+            if (key === 'cod' && payMap.cod.pendingCount > 0) {
+                cntEl.innerHTML = `${payMap.cod.count} order${payMap.cod.count === 1 ? '' : 's'} <span style="color:var(--accent-orange); font-weight:700;">(${payMap.cod.pendingCount} pending)</span>`;
+            } else if (key === 'credit' && payMap.credit.pendingCount > 0) {
+                cntEl.innerHTML = `${payMap.credit.count} order${payMap.credit.count === 1 ? '' : 's'} <span style="color:var(--accent-red); font-weight:700;">(${payMap.credit.pendingCount} due)</span>`;
+            } else {
+                cntEl.textContent = `${payMap[key].count} order${payMap[key].count === 1 ? '' : 's'}`;
+            }
+        }
     };
 
     setPayCard('cash', 'cash');
@@ -8784,10 +8974,27 @@ window.renderSalesTable = () => {
 
         let paymentBadge = getPaymentBadge(order.paymentMethod);
         let statusBadge = '';
-        if (order.paymentStatus === 'Pending' || (order.paymentMethod.toLowerCase().includes('cod') && order.paymentStatus !== 'Paid')) {
-            statusBadge = `<span class="category-badge badge-yellow" style="font-size:0.7rem; margin-top:3px; display:inline-block;"><i class="fa-solid fa-clock"></i> Pending</span>`;
-        } else if (order.paymentStatus === 'Due' || order.paymentMethod.toLowerCase().includes('credit')) {
-            statusBadge = `<span class="category-badge badge-red" style="font-size:0.7rem; margin-top:3px; display:inline-block;"><i class="fa-solid fa-triangle-exclamation"></i> Due</span>`;
+        let markPaidBtn = '';
+
+        const isPending = order.paymentStatus === 'Pending' || (order.paymentMethod.toLowerCase().includes('cod') && order.paymentStatus !== 'Paid');
+        const isDue = order.paymentStatus === 'Due' || order.paymentMethod.toLowerCase().includes('credit');
+
+        if (isPending) {
+            statusBadge = `<span class="category-badge badge-yellow" style="font-size:0.7rem; margin-top:3px; display:inline-block;"><i class="fa-solid fa-clock"></i> Pending Payment</span>`;
+            markPaidBtn = `
+                <button type="button" class="btn" onclick="quickMarkPaymentReceived('${order.groupKey}')" title="Quick Mark as Payment Received (Paid)" style="display:inline-flex; align-items:center; gap:4px; font-size:0.72rem; padding:3px 8px; margin-top:4px; border-radius:6px; background:rgba(16,185,129,0.18); color:#10b981; border:1px solid rgba(16,185,129,0.4); cursor:pointer; font-weight:700; white-space:nowrap;">
+                    <i class="fa-solid fa-check"></i> Mark Received
+                </button>
+            `;
+        } else if (isDue) {
+            statusBadge = `<span class="category-badge badge-red" style="font-size:0.7rem; margin-top:3px; display:inline-block;"><i class="fa-solid fa-triangle-exclamation"></i> Due / Credit</span>`;
+            markPaidBtn = `
+                <button type="button" class="btn" onclick="quickMarkPaymentReceived('${order.groupKey}')" title="Quick Mark as Payment Received (Paid)" style="display:inline-flex; align-items:center; gap:4px; font-size:0.72rem; padding:3px 8px; margin-top:4px; border-radius:6px; background:rgba(16,185,129,0.18); color:#10b981; border:1px solid rgba(16,185,129,0.4); cursor:pointer; font-weight:700; white-space:nowrap;">
+                    <i class="fa-solid fa-check"></i> Mark Received
+                </button>
+            `;
+        } else {
+            statusBadge = `<span class="category-badge badge-green" style="font-size:0.7rem; margin-top:3px; display:inline-block;"><i class="fa-solid fa-circle-check"></i> Paid</span>`;
         }
 
         let deliveryBadge = getDeliveryBadge(order.deliveryMethod, order.trackingNo || order.note);
@@ -8807,7 +9014,10 @@ window.renderSalesTable = () => {
             <td>${getSaleChannelBadge(order.channel)}</td>
             <td>
                 <div>${paymentBadge}</div>
-                ${statusBadge}
+                <div style="display:flex; flex-direction:column; align-items:flex-start; gap:2px;">
+                    ${statusBadge}
+                    ${markPaidBtn}
+                </div>
             </td>
             <td>
                 <div>${deliveryBadge}</div>
@@ -8815,6 +9025,9 @@ window.renderSalesTable = () => {
             </td>
             <td style="text-align: center;">
                 <div style="display:inline-flex; gap:6px; align-items:center;">
+                    <button class="btn btn-icon" onclick="openPaymentStatusModal('${order.groupKey}')" title="Update Payment Status / Settlement Note" style="background:rgba(59,130,246,0.15); color:#3b82f6;">
+                        <i class="fa-solid fa-wallet"></i>
+                    </button>
                     <button class="btn btn-icon" onclick="openSaleReceiptModal('${order.groupKey}')" title="Print Sale Receipt / Invoice" style="background:rgba(16,185,129,0.15); color:#10b981;">
                         <i class="fa-solid fa-print"></i>
                     </button>
@@ -8831,16 +9044,208 @@ window.renderSalesTable = () => {
 window.clearSalesFilters = () => {
     const s = document.getElementById('sales-filter-search');
     const p = document.getElementById('sales-filter-payment');
+    const st = document.getElementById('sales-filter-status');
     const c = document.getElementById('sales-filter-channel');
     const sd = document.getElementById('sales-filter-start-date');
     const ed = document.getElementById('sales-filter-end-date');
     if (s) s.value = '';
     if (p) p.value = '';
+    if (st) st.value = '';
     if (c) c.value = '';
     if (sd) sd.value = '';
     if (ed) ed.value = '';
     renderSalesTable();
     updateSalesKPIs();
+};
+
+// Quick 1-Click Mark Payment Received
+window.quickMarkPaymentReceived = async (groupKey) => {
+    const orders = getAllSalesOrders();
+    const order = orders.find(o => o.groupKey === groupKey);
+    if (!order) return;
+
+    const confirmMsg = `Mark payment for Order ${order.orderId} (${formatCurrency(order.totalRevenue)}) as Received (Paid)?`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const receivedTimestamp = new Date().toISOString();
+        const receivedDate = receivedTimestamp.split('T')[0];
+
+        // Group items by itemId to perform single update per inventory document
+        const itemUpdates = new Map();
+        for (const itemRef of order.items) {
+            if (!itemUpdates.has(itemRef.itemId)) {
+                itemUpdates.set(itemRef.itemId, []);
+            }
+            itemUpdates.get(itemRef.itemId).push(itemRef.saleId);
+        }
+
+        for (const [itemId, saleIds] of itemUpdates.entries()) {
+            const item = inventoryData.find(i => i.id === itemId);
+            if (!item) continue;
+
+            const sales = getSales(item);
+            let modified = false;
+            const updatedSales = sales.map(s => {
+                if (saleIds.includes(s.id)) {
+                    modified = true;
+                    return {
+                        ...s,
+                        paymentStatus: 'Paid',
+                        paymentReceivedDate: receivedDate,
+                        paymentReceivedTimestamp: receivedTimestamp
+                    };
+                }
+                return s;
+            });
+
+            if (modified) {
+                await updateDoc(doc(db, "inventory", item.id), {
+                    sales: updatedSales
+                });
+            }
+        }
+
+        alert(`Payment for Order ${order.orderId} successfully marked as Received (Paid)!`);
+    } catch (error) {
+        console.error('Error marking payment received:', error);
+        alert('Failed to mark payment received: ' + (error.message || 'Unknown error'));
+    }
+};
+
+// Payment Status Modal Open / Close / Save
+window.openPaymentStatusModal = (groupKey) => {
+    const orders = getAllSalesOrders();
+    const order = orders.find(o => o.groupKey === groupKey);
+    if (!order) return;
+
+    const modal = document.getElementById('payment-status-modal');
+    if (!modal) return;
+
+    const groupKeyInput = document.getElementById('psm-group-key');
+    if (groupKeyInput) groupKeyInput.value = order.groupKey;
+
+    const orderIdEl = document.getElementById('psm-order-id');
+    if (orderIdEl) orderIdEl.textContent = order.orderId;
+
+    const customerEl = document.getElementById('psm-customer');
+    if (customerEl) {
+        customerEl.textContent = order.customerName ? `${order.customerName}${order.customerPhone ? ' (' + order.customerPhone + ')' : ''}` : 'Walk-in Customer';
+    }
+
+    const amountEl = document.getElementById('psm-amount');
+    if (amountEl) amountEl.textContent = formatCurrency(order.totalRevenue);
+
+    const statusSelect = document.getElementById('psm-status');
+    if (statusSelect) {
+        if (order.paymentStatus === 'Pending' || order.paymentStatus === 'Due' || (order.paymentMethod.toLowerCase().includes('cod') && order.paymentStatus !== 'Paid')) {
+            statusSelect.value = 'Paid';
+        } else {
+            statusSelect.value = order.paymentStatus || 'Paid';
+        }
+    }
+
+    const dateInput = document.getElementById('psm-received-date');
+    if (dateInput) {
+        dateInput.valueAsDate = new Date();
+    }
+
+    const currentMethodEl = document.getElementById('psm-current-method');
+    if (currentMethodEl) {
+        currentMethodEl.textContent = order.paymentMethod;
+    }
+
+    const methodSelect = document.getElementById('psm-payment-method');
+    if (methodSelect) {
+        methodSelect.value = 'keep';
+    }
+
+    const noteInput = document.getElementById('psm-note');
+    if (noteInput) {
+        noteInput.value = '';
+    }
+
+    modal.classList.remove('hidden');
+};
+
+window.closePaymentStatusModal = () => {
+    const modal = document.getElementById('payment-status-modal');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.handleSavePaymentStatus = async (e) => {
+    e.preventDefault();
+    const groupKey = document.getElementById('psm-group-key')?.value;
+    const newStatus = document.getElementById('psm-status')?.value || 'Paid';
+    const receivedDate = document.getElementById('psm-received-date')?.value || new Date().toISOString().split('T')[0];
+    const newMethod = document.getElementById('psm-payment-method')?.value;
+    const note = (document.getElementById('psm-note')?.value || '').trim();
+
+    const orders = getAllSalesOrders();
+    const order = orders.find(o => o.groupKey === groupKey);
+    if (!order) return;
+
+    const submitBtn = document.getElementById('psm-submit-btn');
+    const originalText = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) {
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+        submitBtn.disabled = true;
+    }
+
+    try {
+        const receivedTimestamp = new Date().toISOString();
+        const itemUpdates = new Map();
+        for (const itemRef of order.items) {
+            if (!itemUpdates.has(itemRef.itemId)) {
+                itemUpdates.set(itemRef.itemId, []);
+            }
+            itemUpdates.get(itemRef.itemId).push(itemRef.saleId);
+        }
+
+        for (const [itemId, saleIds] of itemUpdates.entries()) {
+            const item = inventoryData.find(i => i.id === itemId);
+            if (!item) continue;
+
+            const sales = getSales(item);
+            let modified = false;
+            const updatedSales = sales.map(s => {
+                if (saleIds.includes(s.id)) {
+                    modified = true;
+                    const updated = {
+                        ...s,
+                        paymentStatus: newStatus,
+                        paymentReceivedDate: (newStatus === 'Paid' ? receivedDate : (s.paymentReceivedDate || null)),
+                        paymentReceivedTimestamp: (newStatus === 'Paid' ? receivedTimestamp : (s.paymentReceivedTimestamp || null))
+                    };
+                    if (newMethod && newMethod !== 'keep') {
+                        updated.paymentMethod = newMethod;
+                    }
+                    if (note) {
+                        updated.note = s.note ? `${s.note} | Payment Note: ${note}` : `Payment Note: ${note}`;
+                    }
+                    return updated;
+                }
+                return s;
+            });
+
+            if (modified) {
+                await updateDoc(doc(db, "inventory", item.id), {
+                    sales: updatedSales
+                });
+            }
+        }
+
+        closePaymentStatusModal();
+        alert(`Payment status for Order ${order.orderId} updated to "${newStatus}"!`);
+    } catch (error) {
+        console.error('Error updating payment status:', error);
+        alert('Failed to update payment status: ' + (error.message || 'Unknown error'));
+    } finally {
+        if (submitBtn) {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    }
 };
 
 // 8. Delete / Cancel Sale Order (Restores Stock!)
@@ -8943,6 +9348,11 @@ window.openSaleReceiptModal = (groupKeyOrOrderId) => {
                 <span style="color:var(--text-muted); display:block; font-size:0.75rem; text-transform:uppercase;">Payment Method</span>
                 <div>${getPaymentBadge(order.paymentMethod)}</div>
                 <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">Status: <strong>${escapeHtml(order.paymentStatus || 'Paid')}</strong></div>
+                ${(order.paymentStatus !== 'Paid' && (order.paymentStatus === 'Pending' || order.paymentStatus === 'Due' || order.paymentMethod.toLowerCase().includes('cod'))) ? `
+                    <button type="button" onclick="quickMarkPaymentReceived('${order.groupKey}'); openSaleReceiptModal('${order.groupKey}');" class="btn" style="margin-top:6px; background:var(--accent-green); color:#fff; border:none; padding:4px 10px; border-radius:6px; font-size:0.75rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
+                        <i class="fa-solid fa-check"></i> Mark Payment Received
+                    </button>
+                ` : ''}
             </div>
             <div style="text-align: right;">
                 <span style="color:var(--text-muted); display:block; font-size:0.75rem; text-transform:uppercase;">Delivery Method</span>
@@ -9124,7 +9534,7 @@ window.exportSalesPDF = () => {
             o.customerName || '-',
             itemsSummary,
             o.channel,
-            o.paymentMethod,
+            `${o.paymentMethod} (${o.paymentStatus || 'Paid'})`,
             formatCurrency(o.totalRevenue)
         ];
     });
@@ -9185,7 +9595,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // POS custom payment toggle
+    // POS custom payment toggle & auto status
     const posPayment = document.getElementById('pos-sale-payment');
     const posCustomPaymentWrap = document.getElementById('pos-custom-payment-wrap');
     if (posPayment && posCustomPaymentWrap) {
@@ -9195,6 +9605,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('pos-custom-payment')?.focus();
             } else {
                 posCustomPaymentWrap.classList.add('hidden');
+            }
+
+            const statusEl = document.getElementById('pos-payment-status');
+            if (statusEl) {
+                if (e.target.value === 'Cash on Delivery (COD)') {
+                    statusEl.value = 'Pending';
+                } else if (e.target.value === 'Credit / Pay Later') {
+                    statusEl.value = 'Due';
+                } else if (e.target.value === 'Cash' || e.target.value === 'Bank Transfer' || e.target.value === 'Card Payment') {
+                    statusEl.value = 'Paid';
+                }
             }
         });
     }
